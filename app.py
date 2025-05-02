@@ -8,12 +8,15 @@ import base64
 import uuid
 import shutil
 import zipfile
+import tempfile
 from tempfile import NamedTemporaryFile, mkdtemp
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['OUTPUT_FOLDER'] = 'outputs'
+
+# Vercel için geçici klasörleri kullan
+app.config['UPLOAD_FOLDER'] = os.path.join(tempfile.gettempdir(), 'uploads')
+app.config['OUTPUT_FOLDER'] = os.path.join(tempfile.gettempdir(), 'outputs')
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB
 
 # Klasörleri oluştur
@@ -336,4 +339,6 @@ def upload_file():
 
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    # Vercel için port ayarını ekle
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
