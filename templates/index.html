@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV ve TXT Birleştirici</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.0/css/all.min.css">
+    <style>
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            border-bottom: 3px solid #0d6efd;
+        }
+        .dropzone {
+            border: 2px dashed #0d6efd;
+            border-radius: 5px;
+            padding: 30px;
+            text-align: center;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .dropzone:hover {
+            background-color: #e9ecef;
+        }
+        .preview-container {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-icon {
+            margin-right: 10px;
+            font-size: 24px;
+        }
+        .file-name {
+            flex-grow: 1;
+        }
+        .file-remove {
+            cursor: pointer;
+            color: #dc3545;
+        }
+        .loading {
+            display: none;
+            position: relative;
+            width: 100%;
+            margin: 15px 0;
+        }
+        #info-container {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .split-files-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .footer {
+            margin-top: 30px;
+            padding: 15px 0;
+            text-align: center;
+            border-top: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <header class="text-center mb-4">
+            <h1><i class="fas fa-table me-2"></i>CSV ve TXT Dosya Birleştirici ve Bölücü</h1>
+            <p class="lead">CSV ve TXT dosyalarını kolayca birleştirin ve bölebilirsiniz</p>
+        </header>
+
+        <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="merge-tab" data-bs-toggle="tab" data-bs-target="#merge" type="button" role="tab">
+                    <i class="fas fa-object-group me-2"></i>Dosyaları Birleştir
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="split-tab" data-bs-toggle="tab" data-bs-target="#split" type="button" role="tab">
+                    <i class="fas fa-cut me-2"></i>Dosyayı Böl
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="myTabContent">
+            <!-- Birleştirme Sekmesi -->
+            <div class="tab-pane fade show active" id="merge" role="tabpanel" aria-labelledby="merge-tab">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-file-upload me-2"></i>Dosya Yükleme</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="dropzone-merge" class="dropzone">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                            <h4>Dosyaları sürükleyip bırakın</h4>
+                            <p>veya dosya seçmek için tıklayın</p>
+                            <input type="file" id="file-input-merge" multiple accept=".csv,.txt" style="display: none;">
+                        </div>
+
+                        <div id="file-list" class="mb-4"></div>
+
+                        <div class="text-center">
+                            <button id="merge-button" class="btn btn-primary btn-lg" disabled>
+                                <i class="fas fa-object-group me-2"></i>Dosyaları Birleştir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="merge-result" style="display: none;">
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>İşlem Bilgileri</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="info-container" class="mb-3"></div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-table me-2"></i>Veri Önizleme</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive preview-container">
+                                <table id="preview-table" class="table table-striped table-bordered">
+                                    <thead id="preview-head"></thead>
+                                    <tbody id="preview-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-download me-2"></i>Dosya İndirme</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="downloadFormat" id="formatCSV" value="csv" checked>
+                                        <label class="form-check-label" for="formatCSV">CSV</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="downloadFormat" id="formatExcel" value="xlsx">
+                                        <label class="form-check-label" for="formatExcel">Excel</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <button id="download-button" class="btn btn-success">
+                                        <i class="fas fa-download me-2"></i><span id="download-text">CSV Olarak İndir</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="fas fa-cut me-2"></i>Dosyayı Bölmek İster misiniz?</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="split-rows" class="form-label">Kaç satırda bir bölmek istiyorsunuz?</label>
+                                    <select class="form-select" id="split-rows">
+                                        <option value="" selected>Seçiniz...</option>
+                                        <option value="1000">1,000 satır</option>
+                                        <option value="5000">5,000 satır</option>
+                                        <option value="10000">10,000 satır</option>
+                                        <option value="20000">20,000 satır</option>
+                                        <option value="custom">Özel değer</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6" id="custom-rows-container" style="display: none;">
+                                    <label for="custom-rows" class="form-label">Satır sayısı girin:</label>
+                                    <input type="number" class="form-control" id="custom-rows" min="1" value="1000">
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <button id="split-button" class="btn btn-warning" disabled>
+                                    <i class="fas fa-cut me-2"></i>Dosyayı Böl
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="split-result" style="display: none;">
+                        <div class="card mt-4">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Bölünmüş Dosyalar</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="split-files-list" class="split-files-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="loading text-center" id="merge-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Yükleniyor...</span>
+                    </div>
+                    <p class="mt-2">İşlem devam ediyor, lütfen bekleyin...</p>
+                </div>
+            </div>
+
+            <!-- Bölme Sekmesi -->
+            <div class="tab-pane fade" id="split" role="tabpanel" aria-labelledby="split-tab">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-file-upload me-2"></i>Dosya Yükleme</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="dropzone-split" class="dropzone">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                            <h4>Dosyayı sürükleyip bırakın</h4>
+                            <p>veya dosya seçmek için tıklayın</p>
+                            <input type="file" id="file-input-split" accept=".csv,.xlsx" style="display: none;">
+                        </div>
+
+                        <div id="split-file-info" style="display: none;">
+                            <div class="alert alert-info">
+                                <h5 id="uploaded-filename"></h5>
+                                <p id="uploaded-fileinfo"></p>
+                            </div>
+                        </div>
+
+                        <div id="split-preview" style="display: none;">
+                            <h5>Veri Önizleme</h5>
+                            <div class="table-responsive preview-container">
+                                <table id="split-preview-table" class="table table-striped table-bordered">
+                                    <thead id="split-preview-head"></thead>
+                                    <tbody id="split-preview-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="split-options" style="display: none;" class="mt-4">
+                            <h5>Bölme Seçenekleri</h5>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="split-rows-direct" class="form-label">Kaç satırda bir bölmek istiyorsunuz?</label>
+                                    <select class="form-select" id="split-rows-direct">
+                                        <option value="" selected>Seçiniz...</option>
+                                        <option value="1000">1,000 satır</option>
+                                        <option value="5000">5,000 satır</option>
+                                        <option value="10000">10,000 satır</option>
+                                        <option value="20000">20,000 satır</option>
+                                        <option value="custom">Özel değer</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6" id="custom-rows-direct-container" style="display: none;">
+                                    <label for="custom-rows-direct" class="form-label">Satır sayısı girin:</label>
+                                    <input type="number" class="form-control" id="custom-rows-direct" min="1" value="1000">
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <button id="split-direct-button" class="btn btn-warning">
+                                    <i class="fas fa-cut me-2"></i>Dosyayı Böl
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="split-direct-result" style="display: none;">
+                    <div class="card mt-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Bölünmüş Dosyalar</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="split-direct-files-list" class="split-files-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="loading text-center" id="split-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Yükleniyor...</span>
+                    </div>
+                    <p class="mt-2">İşlem devam ediyor, lütfen bekleyin...</p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>CSV ve TXT Birleştirici v1.0.0  | EcomSpace &copy; 2025 | powered by mazhar</p>
+        </footer>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global değişkenler
+        let outputId = null;
+        const selectedFiles = [];
+
+        // DOM yüklendikten sonra
+        document.addEventListener('DOMContentLoaded', function() {
+            setupDropzone('merge');
+            setupDropzone('split');
+            setupEventListeners();
+        });
+
+        // Dropzone kurulumu
+        function setupDropzone(type) {
+            const dropzone = document.getElementById(`dropzone-${type}`);
+            const fileInput = document.getElementById(`file-input-${type}`);
+
+            // Tıklama olayı
+            dropzone.addEventListener('click', function() {
+                fileInput.click();
+            });
+
+            // Dosya seçimi
+            fileInput.addEventListener('change', function() {
+                if (type === 'merge') {
+                    handleMergeFiles(this.files);
+                } else {
+                    handleSplitFile(this.files[0]);
+                }
+            });
+
+            // Sürükle bırak olayları
+            dropzone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.backgroundColor = '#e9ecef';
+            });
+
+            dropzone.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.backgroundColor = '#f8f9fa';
+            });
+
+            dropzone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.backgroundColor = '#f8f9fa';
+                
+                if (type === 'merge') {
+                    handleMergeFiles(e.dataTransfer.files);
+                } else {
+                    handleSplitFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        // Olay dinleyicileri
+        function setupEventListeners() {
+            // Birleştirme butonu
+            document.getElementById('merge-button').addEventListener('click', mergeFiles);
+
+            // Bölme butonu (birleştirme sonrası)
+            document.getElementById('split-button').addEventListener('click', splitMergedFile);
+
+            // Doğrudan bölme butonu
+            document.getElementById('split-direct-button').addEventListener('click', splitUploadedFile);
+
+            // İndirme butonu
+            document.getElementById('download-button').addEventListener('click', downloadMergedFile);
+
+            // Format değişimi
+            document.querySelectorAll('input[name="downloadFormat"]').forEach(function(radio) {
+                radio.addEventListener('change', function() {
+                    document.getElementById('download-text').textContent = 
+                        this.value === 'csv' ? 'CSV Olarak İndir' : 'Excel Olarak İndir';
+                });
+            });
+
+            // Özel satır sayısı seçimi (birleştirme sonrası)
+            document.getElementById('split-rows').addEventListener('change', function() {
+                const customContainer = document.getElementById('custom-rows-container');
+                if (this.value === 'custom') {
+                    customContainer.style.display = 'block';
+                } else {
+                    customContainer.style.display = 'none';
+                }
+                document.getElementById('split-button').disabled = this.value === '';
+            });
+
+            // Özel satır sayısı seçimi (doğrudan bölme)
+            document.getElementById('split-rows-direct').addEventListener('change', function() {
+                const customContainer = document.getElementById('custom-rows-direct-container');
+                if (this.value === 'custom') {
+                    customContainer.style.display = 'block';
+                } else {
+                    customContainer.style.display = 'none';
+                }
+            });
+        }
+
+        // Birleştirme için dosya ekleme
+        function handleMergeFiles(files) {
+            // Sadece CSV ve TXT dosyalarını al
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const extension = file.name.split('.').pop().toLowerCase();
+                
+                if (extension === 'csv' || extension === 'txt') {
+                    // Zaten eklenmiş mi kontrol et
+                    if (!selectedFiles.some(f => f.name === file.name)) {
+                        selectedFiles.push(file);
+                    }
+                }
+            }
+            
+            // Dosya listesini güncelle
+            updateFileList();
+            
+            // Birleştirme butonunu etkinleştir
+            document.getElementById('merge-button').disabled = selectedFiles.length === 0;
+        }
+
+        // Dosya listesini güncelle
+        function updateFileList() {
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = '';
+            
+            selectedFiles.forEach((file, index) => {
+                const extension = file.name.split('.').pop().toLowerCase();
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                
+                const iconClass = extension === 'csv' ? 'fa-file-csv' : 'fa-file-alt';
+                
+                item.innerHTML = `
+                    <i class="fas ${iconClass} file-icon text-primary"></i>
+                    <div class="file-name">${file.name}</div>
+                    <i class="fas fa-times file-remove" data-index="${index}"></i>
+                `;
+                
+                fileList.appendChild(item);
+            });
+            
+            // Dosya kaldırma olaylarını ekle
+            document.querySelectorAll('.file-remove').forEach(button => {
+                button.addEventListener('click', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    selectedFiles.splice(index, 1);
+                    updateFileList();
+                    document.getElementById('merge-button').disabled = selectedFiles.length === 0;
+                });
+            });
+        }
+
+        // Dosyaları birleştir
+        function mergeFiles() {
+            // Yükleme göstergesini göster
+            document.getElementById('merge-loading').style.display = 'block';
+            
+            // FormData oluştur
+            const formData = new FormData();
+            selectedFiles.forEach(file => {
+                formData.append('files[]', file);
+            });
+            
+            // API isteği gönder
+            fetch('/merge', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Yükleme göstergesini gizle
+                document.getElementById('merge-loading').style.display = 'none';
+                
+                if (data.success) {
+                    // Sonuç ID'sini kaydet
+                    outputId = data.output_id;
+                    
+                    // İşlem bilgilerini göster
+                    const infoContainer = document.getElementById('info-container');
+                    infoContainer.innerHTML = '';
+                    data.info.forEach(info => {
+                        const p = document.createElement('p');
+                        p.textContent = info;
+                        infoContainer.appendChild(p);
+                    });
+                    
+                    // Önizleme tablosunu oluştur
+                    createPreviewTable(data.preview, data.columns);
+                    
+                    // Sonuç bölümünü göster
+                    document.getElementById('merge-result').style.display = 'block';
+                } else {
+                    // Hata göster
+                    alert('Dosyalar birleştirilirken bir hata oluştu:\n' + data.info.join('\n'));
+                }
+            })
+            .catch(error => {
+                // Yükleme göstergesini gizle
+                document.getElementById('merge-loading').style.display = 'none';
+                alert('Bir hata oluştu: ' + error);
+            });
+        }
+
+        // Önizleme tablosunu oluştur
+        function createPreviewTable(preview, columns) {
+            const thead = document.getElementById('preview-head');
+            const tbody = document.getElementById('preview-body');
+            
+            // Tablo başlıklarını oluştur
+            let headerRow = '<tr>';
+            columns.forEach(column => {
+                headerRow += `<th>${column}</th>`;
+            });
+            headerRow += '</tr>';
+            thead.innerHTML = headerRow;
+            
+            // Tablo satırlarını oluştur
+            tbody.innerHTML = '';
+            preview.forEach(row => {
+                let tr = document.createElement('tr');
+                
+                columns.forEach(column => {
+                    let td = document.createElement('td');
+                    td.textContent = row[column] !== null && row[column] !== undefined ? row[column] : '';
+                    tr.appendChild(td);
+                });
+                
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Birleştirilmiş dosyayı indir
+        function downloadMergedFile() {
+            if (!outputId) return;
+            
+            const format = document.querySelector('input[name="downloadFormat"]:checked').value;
+            const filename = `mazhar_merged_data.${format}`;
+            
+            window.location.href = `/download/${outputId}/${filename}`;
+        }
+
+        // Birleştirilmiş dosyayı böl
+        function splitMergedFile() {
+            if (!outputId) return;
+            
+            // Satır sayısını al
+            let rowsPerFile = 0;
+            const splitOption = document.getElementById('split-rows').value;
+            
+            if (splitOption === 'custom') {
+                rowsPerFile = parseInt(document.getElementById('custom-rows').value);
+            } else {
+                rowsPerFile = parseInt(splitOption);
+            }
+            
+            if (rowsPerFile <= 0) {
+                alert('Lütfen geçerli bir satır sayısı girin');
+                return;
+            }
+            
+            // Yükleme göstergesini göster
+            document.getElementById('merge-loading').style.display = 'block';
+            
+            // Dosya formatını al
+            const format = document.querySelector('input[name="downloadFormat"]:checked').value;
+            
+            // API isteği gönder
+            fetch('/split', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    output_id: outputId,
+                    rows_per_file: rowsPerFile,
+                    format: format
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Yükleme göstergesini gizle
+                document.getElementById('merge-loading').style.display = 'none';
+                
+                if (data.success) {
+                    // Bölünmüş dosya listesini oluştur
+                    const filesList = document.getElementById('split-files-list');
+                    filesList.innerHTML = '';
+                    
+                    // Zip indirme butonu ekle
+                    const zipDiv = document.createElement('div');
+                    zipDiv.className = 'alert alert-success mb-3';
+                    zipDiv.innerHTML = `
+                        <h5><i class="fas fa-file-archive me-2"></i>Tüm dosyaları ZIP olarak indir</h5>
+                        <p>Toplam ${data.total_files} dosya, tek bir ZIP arşivi içinde.</p>
+                        <a href="/download/${data.output_id}/${data.zip_filename}" class="btn btn-success">
+                            <i class="fas fa-download me-2"></i>ZIP Olarak İndir
+                        </a>
+                    `;
+                    filesList.appendChild(zipDiv);
+                    
+                    // Ayrı dosya listesi başlığı
+                    const filesHeader = document.createElement('h5');
+                    filesHeader.className = 'mt-4 mb-3';
+                    filesHeader.innerHTML = 'Dosyaları Ayrı Ayrı İndirin:';
+                    filesList.appendChild(filesHeader);
+                    
+                    // Dosya listesini göster
+                    data.files.forEach(file => {
+                        const item = document.createElement('div');
+                        item.className = 'file-item';
+                        
+                        item.innerHTML = `
+                            <i class="fas fa-file-csv file-icon text-success"></i>
+                            <div class="file-name">${file.filename} (${file.rows} satır)</div>
+                            <a href="/download/${data.output_id}/split/${file.filename}" class="btn btn-sm btn-success">
+                                <i class="fas fa-download"></i> İndir
+                            </a>
+                        `;
+                        
+                        filesList.appendChild(item);
+                    });
+                    
+                    // Sonuç bölümünü göster
+                    document.getElementById('split-result').style.display = 'block';
+                } else {
+                    alert('Dosya bölünürken bir hata oluştu: ' + data.error);
+                }
+            })
+            .catch(error => {
+                // Yükleme göstergesini gizle
+                document.getElementById('merge-loading').style.display = 'none';
+                alert('Bir hata oluştu: ' + error);
+            });
+        }
+
+        // Doğrudan bölme için dosya seçimi
+        function handleSplitFile(file) {
+            if (!file) return;
+            
+            const extension = file.name.split('.').pop().toLowerCase();
+            
+            // Sadece CSV ve Excel dosyalarını kabul et
+            if (extension !== 'csv' && extension !== 'xlsx') {
+                alert('Lütfen CSV veya Excel dosyası seçin');
+                return;
+            }
+            
+            // Yükleme göstergesini göster
+            document.getElementById('split-loading').style.display = 'block';
+            
+            // FormData oluştur
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // API isteği gönder
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Yükleme göstergesini gizle
+                document.getElementById('split-loading').style.display = 'none';
+                
+                if (data.success) {
+                    // Dosya bilgilerini göster
+                    document.getElementById('uploaded-filename').textContent = data.filename;
+                    document.getElementById('uploaded-fileinfo').textContent = 
+                        `Toplam ${data.total_rows} satır, ${data.columns.length} sütun`;
+                    document.getElementById('split-file-info').style.display = 'block';
+                    
+                    // Önizleme tablosunu oluştur
+                    const thead = document.getElementById('split-preview-head');
+                    const tbody = document.getElementById('split-preview-body');
+                    
+                    // Tablo başlıklarını oluştur
+                    let headerRow = '<tr>';
+                    data.columns.forEach(column => {
+                        headerRow += `<th>${column}</th>`;
+                    });
+                    headerRow += '</tr>';
+                    thead.innerHTML = headerRow;
+                    
+                    // Tablo satırlarını oluştur
+                    tbody.innerHTML = '';
+                    data.preview.forEach(row => {
+                        let tr = document.createElement('tr');
+                        
+                        data.columns.forEach(column => {
+                            let td = document.createElement('td');
+                            td.textContent = row[column] !== null && row[column] !== undefined ? row[column] : '';
+                            tr.appendChild(td);
+                        });
+                        
+                        tbody.appendChild(tr);
+                    });
+                    
+                    // Önizleme ve bölme seçeneklerini göster
+                    document.getElementById('split-preview').style.display = 'block';
+                    document.getElementById('split-options').style.display = 'block';
+                    
+                    // Çıktı ID'sini kaydet
+                    outputId = data.output_id;
+                } else {
+                    alert('Dosya yüklenirken bir hata oluştu: ' + data.error);
+                }
+            })
+            .catch(error => {
+                // Yükleme göstergesini gizle
+                document.getElementById('split-loading').style.display = 'none';
+                alert('Bir hata oluştu: ' + error);
+            });
+        }
+
+        // Yüklenmiş dosyayı böl
+        function splitUploadedFile() {
+            if (!outputId) return;
+            
+            // Satır sayısını al
+            let rowsPerFile = 0;
+            const splitOption = document.getElementById('split-rows-direct').value;
+            
+            if (splitOption === 'custom') {
+                rowsPerFile = parseInt(document.getElementById('custom-rows-direct').value);
+            } else {
+                rowsPerFile = parseInt(splitOption);
+            }
+            
+            if (rowsPerFile <= 0) {
+                alert('Lütfen geçerli bir satır sayısı girin');
+                return;
+            }
+            
+            // Yükleme göstergesini göster
+            document.getElementById('split-loading').style.display = 'block';
+            
+            // API isteği gönder
+            fetch('/split', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    output_id: outputId,
+                    rows_per_file: rowsPerFile
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Yükleme göstergesini gizle
+                document.getElementById('split-loading').style.display = 'none';
+                
+                if (data.success) {
+                    // Bölünmüş dosya listesini oluştur
+                    const filesList = document.getElementById('split-direct-files-list');
+                    filesList.innerHTML = '';
+                    
+                    // Zip indirme butonu ekle
+                    const zipDiv = document.createElement('div');
+                    zipDiv.className = 'alert alert-success mb-3';
+                    zipDiv.innerHTML = `
+                        <h5><i class="fas fa-file-archive me-2"></i>Tüm dosyaları ZIP olarak indir</h5>
+                        <p>Toplam ${data.total_files} dosya, tek bir ZIP arşivi içinde.</p>
+                        <a href="/download/${data.output_id}/${data.zip_filename}" class="btn btn-success">
+                            <i class="fas fa-download me-2"></i>ZIP Olarak İndir
+                        </a>
+                    `;
+                    filesList.appendChild(zipDiv);
+                    
+                    // Ayrı dosya listesi başlığı
+                    const filesHeader = document.createElement('h5');
+                    filesHeader.className = 'mt-4 mb-3';
+                    filesHeader.innerHTML = 'Dosyaları Ayrı Ayrı İndirin:';
+                    filesList.appendChild(filesHeader);
+                    
+                    // Dosya listesini göster
+                    data.files.forEach(file => {
+                        const item = document.createElement('div');
+                        item.className = 'file-item';
+                        
+                        item.innerHTML = `
+                            <i class="fas fa-file-csv file-icon text-success"></i>
+                            <div class="file-name">${file.filename} (${file.rows} satır)</div>
+                            <a href="/download/${data.output_id}/split/${file.filename}" class="btn btn-sm btn-success">
+                                <i class="fas fa-download"></i> İndir
+                            </a>
+                        `;
+                        
+                        filesList.appendChild(item);
+                    });
+                    
+                    // Sonuç bölümünü göster
+                    document.getElementById('split-direct-result').style.display = 'block';
+                } else {
+                    alert('Dosya bölünürken bir hata oluştu: ' + data.error);
+                }
+            })
+            .catch(error => {
+                // Yükleme göstergesini gizle
+                document.getElementById('split-loading').style.display = 'none';
+                alert('Bir hata oluştu: ' + error);
+            });
+        }
+    </script>
+</body>
+</html> 
